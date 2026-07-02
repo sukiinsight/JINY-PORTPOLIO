@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node src/index.js",
-    "dev": "node --watch src/index.js"
+    "dev": "node --watch src/index.js",
+    "test:once": "node src/test-once.js"
   },
   "dependencies": {
     "@notionhq/client": "^2.2.15",
