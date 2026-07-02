@@ -5,6 +5,8 @@ import { createNotionRecord, hasNotionRecord } from "./notion.js";
 
 export const bot = new Telegraf(config.TELEGRAM_BOT_TOKEN);
 
+const shouldRethrowHandlerErrors = process.env.PROCESS_PENDING_UPDATES === "true";
+
 function isAllowed(ctx) {
   if (allowedTelegramUserIds.length === 0) {
     return true;
@@ -92,7 +94,7 @@ async function handleRecord(ctx) {
       imageUrl,
       telegramUser: senderLabel(ctx),
       telegramMessageKey: messageKey,
-      createdAt: new Date((ctx.message?.date || Math.floor(Date.now() / 1000)) * 1000)
+      createdAt: new Date((ctx.message?.date || Math.floor(Date.now() / 1000)) * 1000),
     });
 
     await ctx.telegram.editMessageText(
@@ -109,12 +111,66 @@ async function handleRecord(ctx) {
     );
   } catch (error) {
     console.error(error);
-    await ctx.telegram.editMessageText(
-      ctx.chat.id,
-      processingMessage.message_id,
-      undefined,
-      "저장 중 문제가 생겼어요. 환경 변수, Notion DB 속성, integration 권한을 확인해주세요."
-    );
+    try {
+      await ctx.telegram.editMessageText(
+        ctx.chat.id,
+        processingMessage.message_id,
+        undefined,
+        "저장 중 문제가 생겼어요. 다음 run-bot 실행 때 다시 시도할게요."
+      );
+    } catch (replyError) {
+      console.error("Failed to send error message to Telegram", replyError);
+    }
+
+    if (shouldRethrowHandlerErrors) {
+      throw error;
+    }
+  }
+}
+
+async function fetchTelegramUpdates(params) {
+  return bot.telegram.callApi("getUpdates", params);
+}
+
+async function confirmTelegramUpdates(offset) {
+  await fetchTelegramUpdates({
+    offset,
+    limit: 1,
+    timeout: 0,
+    allowed_updates: ["message"],
+  });
+}
+
+export async function processPendingUpdates() {
+  await bot.telegram.callApi("deleteWebhook", { drop_pending_updates: false });
+
+  let offset;
+  let processedCount = 0;
+
+  while (true) {
+    const updates = await fetchTelegramUpdates({
+      offset,
+      limit: 100,
+      timeout: 0,
+      allowed_updates: ["message"],
+    });
+
+    if (updates.length === 0) {
+      console.log(`No pending Telegram updates left. Processed ${processedCount} update(s).`);
+      return;
+    }
+
+    for (const update of updates) {
+      try {
+        await bot.handleUpdate(update);
+        offset = update.update_id + 1;
+        await confirmTelegramUpdates(offset);
+        processedCount += 1;
+      } catch (error) {
+        console.error(`Stopped before confirming Telegram update ${update.update_id}`, error);
+        throw error;
+      }
+    }
   }
 }
 
