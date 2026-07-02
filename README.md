@@ -2,6 +2,8 @@
 
 Telegram으로 보낸 손그림, 손글씨, 일기, 느낀 점, 아이의 말, 부모 관찰 메모, 사진 기록을 GPT가 분석하고 Notion 데이터베이스에 자동 저장하는 봇입니다.
 
+사용할 Telegram 봇: [@Jiny_portf_bot](https://t.me/Jiny_portf_bot)
+
 ## 기능
 
 - Telegram 텍스트, 사진, 이미지 파일 수신
@@ -73,6 +75,8 @@ NOTION_API_KEY=...
 NOTION_DATABASE_ID=...
 ```
 
+`TELEGRAM_BOT_TOKEN`에는 `@Jiny_portf_bot` 이름이 아니라 BotFather가 발급한 토큰 값을 넣어야 합니다.
+
 ## 실행
 
 개발 환경에서는 polling으로 실행됩니다.
@@ -94,7 +98,7 @@ npm start
 
 ## 사용법
 
-Telegram 봇에게 아래처럼 보내면 됩니다.
+Telegram에서 [@Jiny_portf_bot](https://t.me/Jiny_portf_bot)에게 아래처럼 보내면 됩니다.
 
 - 텍스트만 보내기: 아이의 말, 일기, 부모 메모 등
 - 사진 + 캡션 보내기: 손그림, 손글씨, 사진 기록 등
