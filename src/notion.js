@@ -3,6 +3,41 @@ import { config } from "./config.js";
 
 const notion = new Client({ auth: config.NOTION_API_KEY });
 
+function isRetryableNetworkError(error) {
+  const message = String(error?.message || "");
+  return [
+    "Premature close",
+    "ERR_STREAM_PREMATURE_CLOSE",
+    "ECONNRESET",
+    "ETIMEDOUT",
+    "FetchError"
+  ].some((value) => message.includes(value) || error?.code === value);
+}
+
+async function wait(ms) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withRetry(label, operation) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableNetworkError(error) || attempt === 3) {
+        throw error;
+      }
+
+      console.warn(`${label} failed on attempt ${attempt}; retrying...`, error);
+      await wait(1000 * attempt);
+    }
+  }
+
+  throw lastError;
+}
+
 function richText(content) {
   if (!content) {
     return [];
@@ -36,7 +71,7 @@ export async function hasNotionRecord(telegramMessageKey) {
     return false;
   }
 
-  const response = await notion.databases.query({
+  const response = await withRetry("Notion duplicate check", () => notion.databases.query({
     database_id: config.NOTION_DATABASE_ID,
     filter: {
       property: "원문",
@@ -45,7 +80,7 @@ export async function hasNotionRecord(telegramMessageKey) {
       }
     },
     page_size: 1
-  });
+  }));
 
   return response.results.length > 0;
 }
@@ -80,7 +115,7 @@ export async function createNotionRecord({
     });
   }
 
-  return notion.pages.create({
+  return withRetry("Notion page create", () => notion.pages.create({
     parent: { database_id: config.NOTION_DATABASE_ID },
     properties: {
       이름: {
@@ -115,5 +150,5 @@ export async function createNotionRecord({
       }
     },
     children
-  });
+  }));
 }
