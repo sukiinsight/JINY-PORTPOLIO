@@ -5,6 +5,41 @@ import { analysisSystemPrompt, buildAnalysisUserPrompt } from "./prompts.js";
 
 const openai = new OpenAI({ apiKey: config.OPENAI_API_KEY });
 
+function isRetryableNetworkError(error) {
+  const message = String(error?.message || "");
+  return [
+    "Premature close",
+    "ERR_STREAM_PREMATURE_CLOSE",
+    "ECONNRESET",
+    "ETIMEDOUT",
+    "FetchError"
+  ].some((value) => message.includes(value) || error?.code === value);
+}
+
+async function wait(ms) {
+  await new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function withRetry(label, operation) {
+  let lastError;
+
+  for (let attempt = 1; attempt <= 3; attempt += 1) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      if (!isRetryableNetworkError(error) || attempt === 3) {
+        throw error;
+      }
+
+      console.warn(`${label} failed on attempt ${attempt}; retrying...`, error);
+      await wait(1000 * attempt);
+    }
+  }
+
+  throw lastError;
+}
+
 const recordTypes = [
   "손그림",
   "손글씨",
@@ -72,7 +107,7 @@ export async function analyzeRecord({ text, imageUrl }) {
     });
   }
 
-  const response = await openai.chat.completions.create({
+  const response = await withRetry("OpenAI analysis", () => openai.chat.completions.create({
     model: config.OPENAI_MODEL,
     response_format: {
       type: "json_schema",
@@ -86,7 +121,7 @@ export async function analyzeRecord({ text, imageUrl }) {
       { role: "system", content: analysisSystemPrompt },
       { role: "user", content }
     ]
-  });
+  }));
 
   const raw = response.choices[0]?.message?.content;
   if (!raw) {
