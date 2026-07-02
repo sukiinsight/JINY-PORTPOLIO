@@ -1,7 +1,7 @@
 import { Telegraf } from "telegraf";
 import { allowedTelegramUserIds, config } from "./config.js";
 import { analyzeRecord } from "./openaiAnalysis.js";
-import { createNotionRecord } from "./notion.js";
+import { createNotionRecord, hasNotionRecord } from "./notion.js";
 
 export const bot = new Telegraf(config.TELEGRAM_BOT_TOKEN);
 
@@ -21,6 +21,16 @@ function senderLabel(ctx) {
 
   const name = [from.first_name, from.last_name].filter(Boolean).join(" ");
   return `${name || from.username || "unknown"} (${from.id})`;
+}
+
+function telegramMessageKey(ctx) {
+  const chatId = ctx.chat?.id;
+  const messageId = ctx.message?.message_id;
+  if (!chatId || !messageId) {
+    return "";
+  }
+
+  return `${chatId}:${messageId}`;
 }
 
 async function getTelegramFileUrl(ctx, fileId) {
@@ -61,6 +71,17 @@ async function handleRecord(ctx) {
     return;
   }
 
+  const messageKey = telegramMessageKey(ctx);
+
+  try {
+    if (await hasNotionRecord(messageKey)) {
+      await ctx.reply("이미 Notion에 저장된 메시지라 건너뛰었어요.");
+      return;
+    }
+  } catch (error) {
+    console.error("Failed to check duplicate Notion record", error);
+  }
+
   const processingMessage = await ctx.reply("기록을 읽고 Notion에 정리하는 중이에요.");
 
   try {
@@ -70,6 +91,7 @@ async function handleRecord(ctx) {
       originalText: text,
       imageUrl,
       telegramUser: senderLabel(ctx),
+      telegramMessageKey: messageKey,
       createdAt: new Date((ctx.message?.date || Math.floor(Date.now() / 1000)) * 1000)
     });
 
@@ -82,7 +104,7 @@ async function handleRecord(ctx) {
         `유형: ${analysis.recordType}`,
         `성장 신호: ${analysis.growthSignals.join(", ")}`,
         `대표 기록: ${analysis.isRepresentative ? "예" : "아니오"}`,
-        page.url
+        page.url,
       ].join("\n")
     );
   } catch (error) {
