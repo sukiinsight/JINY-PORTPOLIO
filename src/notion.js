@@ -26,17 +26,48 @@ function paragraph(content) {
   };
 }
 
+function telegramMessageMarker(telegramMessageKey) {
+  return telegramMessageKey ? `[Telegram 메시지 ID: ${telegramMessageKey}]` : "";
+}
+
+export async function hasNotionRecord(telegramMessageKey) {
+  const marker = telegramMessageMarker(telegramMessageKey);
+  if (!marker) {
+    return false;
+  }
+
+  const response = await notion.databases.query({
+    database_id: config.NOTION_DATABASE_ID,
+    filter: {
+      property: "원문",
+      rich_text: {
+        contains: marker
+      }
+    },
+    page_size: 1
+  });
+
+  return response.results.length > 0;
+}
+
 export async function createNotionRecord({
   analysis,
   originalText,
   imageUrl,
   telegramUser,
+  telegramMessageKey,
   createdAt
 }) {
+  const marker = telegramMessageMarker(telegramMessageKey);
+  const originalTextWithMarker = [marker, originalText].filter(Boolean).join("\n\n");
   const children = [
     paragraph(analysis.summary),
     paragraph(`다음 경험: ${analysis.nextExperience}`)
   ];
+
+  if (marker) {
+    children.push(paragraph(marker));
+  }
 
   if (imageUrl) {
     children.push({
@@ -77,7 +108,7 @@ export async function createNotionRecord({
         checkbox: analysis.isRepresentative
       },
       원문: {
-        rich_text: richText(originalText)
+        rich_text: richText(originalTextWithMarker)
       },
       "Telegram 사용자": {
         rich_text: richText(telegramUser)
