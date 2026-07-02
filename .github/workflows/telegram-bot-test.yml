@@ -50,3 +50,4 @@ jobs:
           NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
           NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           ALLOWED_TELEGRAM_USER_IDS: ${{ secrets.ALLOWED_TELEGRAM_USER_IDS }}
+          PROCESS_PENDING_UPDATES: "true"
