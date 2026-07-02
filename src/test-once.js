@@ -1,11 +1,6 @@
 import "dotenv/config";
 
-const requiredEnvVars = [
-  "TELEGRAM_BOT_TOKEN",
-  "TELEGRAM_CHAT_ID",
-  "NOTION_TOKEN",
-  "NOTION_DATABASE_ID"
-];
+const requiredEnvVars = ["TELEGRAM_BOT_TOKEN", "TELEGRAM_CHAT_ID"];
 
 const missingEnvVars = requiredEnvVars.filter((name) => !process.env[name]);
 
@@ -15,10 +10,11 @@ if (missingEnvVars.length > 0) {
 }
 
 const message = [
-  "GitHub Actions test message",
+  "GitHub Actions Telegram send test",
   `Repository: ${process.env.GITHUB_REPOSITORY || "local"}`,
   `Run: ${process.env.GITHUB_RUN_ID || "manual"}`,
-  "The one-time Telegram test completed successfully."
+  "This only verifies outbound Telegram delivery.",
+  "Inbound bot processing and Notion writes require npm start on an always-on server."
 ].join("\n");
 
 const response = await fetch(
@@ -40,4 +36,4 @@ if (!response.ok) {
   throw new Error(`Telegram test message failed: ${response.status} ${body}`);
 }
 
-console.log("Telegram test message sent successfully.");
+console.log("Telegram send test message sent successfully.");
